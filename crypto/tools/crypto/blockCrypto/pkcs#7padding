@@ -1,0 +1,17 @@
+import sys
+
+if sys.argv[1] == "-h" or sys.argv[1] == "--help":
+        print "This pads a string using PKC#7 padding
+        print "encryptXOR [string]"
+        exit()
+
+t = ''.join([hex(ord(x)) for x in list(sys.argv[2])])
+fLength = int(sys.argv[1])
+iLength = len(t) 
+num = fLength - (iLength % fLength)
+for i in range(num):
+	if num < 16:
+		t = t + "0" + hex(num) 
+	else:
+		t = t + hex(num)
+print "0x" + t.replace("0x","")

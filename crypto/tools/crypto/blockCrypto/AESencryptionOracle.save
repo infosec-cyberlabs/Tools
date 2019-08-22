@@ -1,0 +1,98 @@
+import sys
+import numpy
+import random
+import time
+import base64
+from loremipsum import get_sentences
+from Crypto.Cipher import AES
+
+if sys.argv[1] == "-h" or sys.argv[1] == "--help":
+        print "This program encrypts text using CBC or ECB with a random key and initilizaton vector"
+        print "AESencryptionOracle [text]"
+        exit()
+
+def randKey():
+	num = str(hex(random.randint(0,int("F"*32,16)))).replace("0x","").replace('L','')
+	while len(num) < 32:
+		num = "0" + num
+	return num
+
+def hex2text(input):
+	output = ""
+	hex = str(input).replace("0x","")
+	for i in range(len(hex)/2):
+		output += chr(int(hex[2 * i:2 + (i * 2)],16))
+	return output
+
+def text2hex(input):
+	output = ""
+	for c in input:
+		h = str(hex(ord(c))).replace("0x","")
+		if len(h) < 2:
+			h = "0" + h
+		output += h
+	return output
+
+def XOR(msg, c):
+	a = list(msg)
+	b = list(c)
+	c = range(len(a))
+	for i in range(len(a)):
+		c[i] = str(hex(int(a[i],16)^int(b[i],16))).replace("0x","")
+	return ''.join(c)
+
+def encryptCBC(msg,key,IV):
+	block = len(key)
+	lastEncryptedBlock = IV
+	A = AES.new(hex2text(key), 1)#, iv)
+	output = ""
+	for i in range(len(msg)/block):
+		lastEncryptedBlock = text2hex(A.encrypt(hex2text(XOR(msg[block*i:block*(i+1)], lastEncryptedBlock))))
+		output += hex2text(lastEncryptedBlock)
+	return base64.b64encode(output)
+
+def encryptECB(msg, key):
+	a = AES.new(key, 1)#, iv)
+	while not(len(msg) %16 == 0):
+		msg = msg + " "
+	print hex2text(msg)
+	return base64.b64encode(a.encrypt(msg))
+	
+random.seed(time.time())
+text = hex2text(str(hex(random.randint(0,int("F"*20,16)))).replace("0x","").replace('L','')) + sys.argv[1] + hex2text(str(hex(random.randint(0,int("F"*20,16)))).replace("0x","").replace('L','')) 
+print text
+key = randKey()
+iv = randKey()
+if random.randint(0,1) == 0:
+	c = encryptCBC(text2hex(text),key,iv)
+	print "CBC"
+else:
+	c = encryptECB(text2hex(text),key)
+	print "ECB"
+print c
+
+fakeText = ''.join(get_sentences(len(c)/10))[:int(len(c)/2)]
+CBCtest = encryptCBC(text2hex(fakeText),key,iv)
+ECBtest = encryptECB(text2hex(fakeText),key)
+charsC = list(text2hex(base64.b64decode(c)))#[::-1])
+charsCBC = list(text2hex(base64.b64decode(CBCtest)))
+charsECB = list(text2hex(base64.b64decode(ECBtest)))
+optionsC = [0]*(int('FF',16)+1)
+optionsCBC = [0]*(int('FF',16)+1)
+optionsECB = [0]*(int('FF',16)+1)
+for i in range(len(charsC)/2):
+	optionsC[int(charsC[(2*i)+1] + charsC[2*i],16)] = optionsC[int(charsC[(2*i)+1] + charsC[2*i],16)] + 1
+stdC = numpy.std(optionsC)/len(c)
+print "CTX " + str(stdC)
+for i in range(len(charsCBC)/2):
+	optionsCBC[int(charsCBC[(2*i)+1] + charsCBC[2*i],16)] = optionsCBC[int(charsCBC[(2*i)+1] + charsCBC[2*i],16)] + 1
+stdCBC = numpy.std(optionsCBC)/len(CBCtest)
+print "CBC " + str(stdCBC)
+for i in range(len(charsECB)/2):
+	optionsECB[int(charsECB[(2*i)+1] + charsECB[2*i],16)] = optionsECB[int(charsECB[(2*i)+1] + charsECB[2*i],16)] + 1
+stdECB = numpy.std(optionsECB)/len(ECBtest)
+print "ECB " + str(stdECB)
+
+#	len	33	72
+#	CBC	.00669	.00514
+#	ECB	.00559	.00314
